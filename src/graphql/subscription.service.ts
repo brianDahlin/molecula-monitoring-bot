@@ -11,7 +11,7 @@ import { TelegramService } from '../telegram/telegram.service';
 import { GQL_SUBSCRIPTION } from '../constants';
 import { TokenOperation } from './types/token-operation.type';
 
-// обёртка ответа GraphQL
+// wrapping the GraphQL response
 interface TokenOperationResponse {
   tokenOperations: TokenOperation;
 }
@@ -20,6 +20,7 @@ interface TokenOperationResponse {
 export class SubscriptionService implements OnModuleInit, OnModuleDestroy {
   private client!: Client;
   private readonly logger = new Logger(SubscriptionService.name);
+  private sentTx = new Set<string>();
 
   constructor(
     private readonly config: ConfigService,
@@ -40,15 +41,13 @@ export class SubscriptionService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async startSubscription() {
-    this.logger.log('>>> START SUBSCRIPTION LOOP');
-    console.log('>>> START SUBSCRIPTION LOOP');
     const filter = {};
     const payload: SubscribePayload = {
       query: GQL_SUBSCRIPTION,
       variables: { filter },
     };
 
-    // асинхронный итератор (делал погайду @graphql-ws вроде воркает :D)
+    // Get async iterator per graphql-ws guide
     const iterable = this.client.iterate<TokenOperationResponse>(payload);
 
     try {
@@ -58,12 +57,18 @@ export class SubscriptionService implements OnModuleInit, OnModuleDestroy {
           this.logger.warn('Received empty data in subscription');
           continue;
         }
+        // Deduplicate by transaction hash
+        if (this.sentTx.has(op.transaction)) {
+          this.logger.debug(`Skipping duplicate op: ${op.transaction}`);
+          continue;
+        }
+        this.sentTx.add(op.transaction);
+
         this.logger.debug(`New op: ${op.transaction} type=${op.type}`);
         await this.telegram.sendMessage(op);
       }
     } catch (err) {
       this.logger.error('Subscription loop error', err as Error);
-      // можно добавить логику реконнекта или экспоненциальный бэкофф, но мне кажется, что graphql-ws сам справится с этим
     }
   }
 
