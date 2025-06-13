@@ -1,0 +1,11 @@
+subscription DebugAllOps {
+  tokenOperations(filter: {}) {
+    _id
+    transaction
+    type
+    created
+    from
+    to
+    value
+  }
+}

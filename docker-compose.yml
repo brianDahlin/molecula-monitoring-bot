@@ -1,0 +1,11 @@
+services:
+  bot-monitor:
+    build: .
+    env_file: .env
+    restart: unless-stopped
+    networks:
+      - botnet
+
+networks:
+  botnet:
+    driver: bridge
