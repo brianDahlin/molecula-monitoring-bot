@@ -62,24 +62,32 @@ export class SubscriptionService implements OnModuleInit, OnModuleDestroy {
       for await (const item of iterable) {
         const op = item.data?.tokenOperations;
         if (!op) {
-          this.logger.warn('Received empty data in subscription');
-          continue;
-        }
-        const from = op.from.toLowerCase();
-        // 2) Если операция от QA-адреса — пропускаем
-        if (QA_ADDRESSES.has(from)) {
-          this.logger.debug(`Skipping QA op from ${op.from}`);
+          this.logger.warn('Received empty operation, skipping');
           continue;
         }
 
-        // Deduplicate by transaction hash
+        const from = op.from.toLowerCase();
+        const to = op.to.toLowerCase();
+
+        // If the operation originates from or is sent to a QA address, skip it
+        if (QA_ADDRESSES.has(from) || QA_ADDRESSES.has(to)) {
+          this.logger.debug(
+            `Skipping QA operation: from=${op.from}, to=${op.to}`,
+          );
+          continue;
+        }
+
+        // Skip duplicate operations based on transaction hash
         if (this.sentTx.has(op.transaction)) {
-          this.logger.debug(`Skipping duplicate op: ${op.transaction}`);
+          this.logger.debug(`Skipping duplicate operation: ${op.transaction}`);
           continue;
         }
         this.sentTx.add(op.transaction);
 
-        this.logger.debug(`New op: ${op.transaction} type=${op.type}`);
+        // Process and forward the new operation to Telegram
+        this.logger.debug(
+          `Processing new operation: ${op.transaction} type=${op.type}`,
+        );
         await this.telegram.sendMessage(op);
       }
     } catch (err) {
