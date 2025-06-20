@@ -41,6 +41,14 @@ export class SubscriptionService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async startSubscription() {
+    const QA_ADDRESSES = new Set([
+      '0xffccfc78c1883a84903688fe0294f7cb075e5fc4',
+      '0xe8b1698c60752522d06a577c1e69c692d27f6bda',
+      '0x10a4ac6e354d22df51308ed3f3b67d566e4275e8',
+      '0xd1b3a474c3d0420813d23fd4cf2f7e91296d3ad2',
+      '0x37ddf1ffa56ea8c0cbcd93ce96a5b8e7885bc1b',
+    ]);
+
     const filter = {};
     const payload: SubscribePayload = {
       query: GQL_SUBSCRIPTION,
@@ -57,6 +65,13 @@ export class SubscriptionService implements OnModuleInit, OnModuleDestroy {
           this.logger.warn('Received empty data in subscription');
           continue;
         }
+        const from = op.from.toLowerCase();
+        // 2) Если операция от QA-адреса — пропускаем
+        if (QA_ADDRESSES.has(from)) {
+          this.logger.debug(`Skipping QA op from ${op.from}`);
+          continue;
+        }
+
         // Deduplicate by transaction hash
         if (this.sentTx.has(op.transaction)) {
           this.logger.debug(`Skipping duplicate op: ${op.transaction}`);
